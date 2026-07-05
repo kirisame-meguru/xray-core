@@ -1,7 +1,7 @@
 # Fork allocation ledger — xray-core
 
-This fork (`kirisame-meguru/xray-core`) adds the **per-user-per-inbound traffic stats** feature on
-branch `per-user-per-inbound-traffic-stats`. To survive indefinite rebasing onto upstream, every
+This fork (`kirisame-meguru/xray-core`) adds the **per-user-per-inbound traffic stats** feature directly
+on **`main`** (`main` is the feature branch). To survive indefinite rebasing onto upstream, every
 identifier this fork allocates from a *shared, sequential namespace* is parked in a **reserved high
 band** so it can never collide with upstream's next-sequential pick. See `../FORK-RESILIENCE.md` for
 the sync playbook.
@@ -15,7 +15,7 @@ feature is rebased directly onto `XTLS/Xray-core`:
 ```
 git remote add xtls https://github.com/XTLS/Xray-core.git   # once
 git fetch xtls --tags
-git rebase --onto <new-xtls-tag> <old-base> per-user-per-inbound-traffic-stats
+git rebase --onto <new-xtls-tag> <old-base> main
 ```
 
 Current base: **`v26.6.27`**. The fork's binary is cut as release **`v26.6.27-perinbound1`** on
