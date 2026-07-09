@@ -356,3 +356,54 @@ func TestConfig_Override(t *testing.T) {
 		})
 	}
 }
+
+// TestTrackTrafficPerUser guards the inbound flag -> dispatcher allowlist
+// derivation. Only tagged inbounds that opt in may be tracked; an inbound
+// without a tag cannot be, since the stat counters are keyed by tag.
+func TestTrackTrafficPerUser(t *testing.T) {
+	const input = `{
+		"inbounds": [
+			{
+				"tag": "tracked",
+				"protocol": "vmess",
+				"port": 443,
+				"settings": {"clients": []},
+				"trackTrafficPerUser": true
+			},
+			{
+				"tag": "untracked",
+				"protocol": "vmess",
+				"port": 444,
+				"settings": {"clients": []}
+			},
+			{
+				"protocol": "vmess",
+				"port": 445,
+				"settings": {"clients": []},
+				"trackTrafficPerUser": true
+			}
+		]
+	}`
+
+	config := new(Config)
+	common.Must(json.Unmarshal([]byte(input), config))
+	built, err := config.Build()
+	common.Must(err)
+
+	var dispatcherConfig *dispatcher.Config
+	for _, app := range built.App {
+		instance, err := app.GetInstance()
+		common.Must(err)
+		if c, ok := instance.(*dispatcher.Config); ok {
+			dispatcherConfig = c
+			break
+		}
+	}
+	if dispatcherConfig == nil {
+		t.Fatal("no dispatcher config in built core config")
+	}
+
+	if diff := cmp.Diff([]string{"tracked"}, dispatcherConfig.TrackedInboundTags); diff != "" {
+		t.Error("tracked inbound tags mismatch (-want +got): ", diff)
+	}
+}
