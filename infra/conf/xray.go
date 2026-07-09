@@ -130,6 +130,11 @@ type InboundDetourConfig struct {
 	Tag            string           `json:"tag"`
 	StreamSetting  *StreamConfig    `json:"streamSettings"`
 	SniffingConfig *SniffingConfig  `json:"sniffing"`
+	// TrackTrafficPerUser enables per-user-per-inbound traffic counters
+	// (useri>>>{email}>>>inbound>>>{tag}>>>traffic>>>{up,down}link) for this
+	// inbound. Requires a non-empty Tag, since the counters are keyed by tag.
+	// [remnawave-fork] see FORK.md.
+	TrackTrafficPerUser bool `json:"trackTrafficPerUser"`
 }
 
 // Build implements Buildable.
@@ -401,6 +406,24 @@ type Config struct {
 	Geodata          *GeodataConfig          `json:"geodata"`
 }
 
+// trackedInboundTags returns the tags of every inbound that opted into
+// per-user-per-inbound traffic counters via trackTrafficPerUser. The counters
+// are keyed by inbound tag, so an untagged inbound can never be tracked.
+func (c *Config) trackedInboundTags() []string {
+	var tags []string
+	for _, ib := range c.InboundConfigs {
+		if !ib.TrackTrafficPerUser {
+			continue
+		}
+		if ib.Tag == "" {
+			errors.LogWarning(context.Background(), `"trackTrafficPerUser" ignored on an inbound without a "tag"`)
+			continue
+		}
+		tags = append(tags, ib.Tag)
+	}
+	return tags
+}
+
 func (c *Config) findInboundTag(tag string) int {
 	found := -1
 	for idx, ib := range c.InboundConfigs {
@@ -518,9 +541,13 @@ func (c *Config) Build() (*core.Config, error) {
 		return nil, errors.New("failed to post-process configuration file").Base(err)
 	}
 
+	dispatcherConfig := &dispatcher.Config{
+		TrackedInboundTags: c.trackedInboundTags(),
+	}
+
 	config := &core.Config{
 		App: []*serial.TypedMessage{
-			serial.ToTypedMessage(&dispatcher.Config{}),
+			serial.ToTypedMessage(dispatcherConfig),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
 		},
